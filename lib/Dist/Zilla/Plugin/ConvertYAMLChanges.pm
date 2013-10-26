@@ -32,17 +32,39 @@ sub munge_file {
     #$log->tracef("Processing file %s ...", $fname);
     $self->log("Processing file $fname ...");
 
-    #use Data::Dump; dd $self;
-    #use Data::Dump; dd $self->zilla;
+    #use Data::Dump; dd $self->zilla->{distmeta};
     my $changes = CPAN::Changes->new(
-        preamble => "Revision history for ", $self->{distmeta}{name},
+        preamble => "Revision history for " . $self->zilla->{distmeta}{name},
     );
     for my $yaml (Load(~~read_file($fname))) {
         next unless ref($yaml) eq 'HASH' && defined $yaml->{version};
-        # group by category of changes
-        if (ref($yaml->{changes}) eq 'ARRAY') {
-            $yaml->{changes} = { '' => $yaml->{changes} };
+
+        my $chs0 = $yaml->{changes};
+        my $chs;
+
+        # try to guess the format of changes:
+        if (ref($chs0) eq 'HASH') {
+            # already categorized? pass unchanged
+            $chs = $chs0;
+        } elsif (ref($chs0) eq 'ARRAY') {
+            for my $ch (@$chs0) {
+                if (ref($ch) eq 'HASH') {
+                    for (keys %$ch) {
+                        $chs->{$_} //= [];
+                        push @{ $chs->{$_} }, $ch->{$_};
+                    }
+                } elsif (!ref($ch)) {
+                    $chs->{''} //= [];
+                    push @{ $chs->{''} }, $ch;
+                } else {
+                    die "Sorry, can't figure out format of change $ch for $yaml->{version}";
+                }
+            }
+        } else {
+            die "Sorry, can't figure out format of changes for $yaml->{version}";
         }
+        #use Data::Dump; dd $chs;
+        $yaml->{changes} = $chs;
         $changes->add_release($yaml);
     }
 
