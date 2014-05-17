@@ -12,7 +12,7 @@ use Moose;
 use namespace::autoclean;
 
 use CPAN::Changes;
-use File::Slurp;
+use File::Slurp::Tiny qw(read_file);
 use YAML::XS;
 
 with (
